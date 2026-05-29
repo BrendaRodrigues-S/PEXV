@@ -1,0 +1,215 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --- ENUMS ---
+
+enum WorkspaceType {
+  CREATIVE_ROUTINE
+  CLIENT_PROJECT
+  FULL_MANAGEMENT
+  CUSTOM
+}
+
+enum WorkspaceStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum LayoutType {
+  KANBAN
+  CALENDAR
+  TIMELINE
+  DASHBOARD
+}
+
+enum TaskType {
+  FOCUS
+  INSPIRATION
+  EXECUTION
+  REVISION
+  MEETING
+  CLIENT
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// --- MODELS ---
+
+model User {
+  id              String           @id @default(uuid())
+  name            String
+  email           String           @unique
+  password        String
+  avatar          String?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  workspaces      Workspace[]
+  analyticsEvents AnalyticsEvent[]
+  moodTrackings   MoodTracking[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id            String          @id @default(uuid())
+  userId        String          @map("user_id")
+  name          String
+  description   String?
+  workspaceType WorkspaceType   @default(CUSTOM) @map("workspace_type")
+  status        WorkspaceStatus @default(DRAFT)
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boards       Board[]
+  clients      Client[]
+  inspirations Inspiration[]
+
+  @@map("workspaces")
+}
+
+model Template {
+  id           String        @id @default(uuid())
+  title        String
+  description  String
+  templateType WorkspaceType @map("template_type")
+  configJson   Json          @map("config_json")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  @@map("templates")
+}
+
+model Board {
+  id          String     @id @default(uuid())
+  workspaceId String     @map("workspace_id")
+  title       String
+  layoutType  LayoutType @default(KANBAN) @map("layout_type")
+  position    Int        @default(0)
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  columns   Column[]
+  tasks     Task[]
+
+  @@map("boards")
+}
+
+model Column {
+  id        String   @id @default(uuid())
+  boardId   String   @map("board_id")
+  title     String
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@map("columns")
+}
+
+model Task {
+  id            String    @id @default(uuid())
+  boardId       String    @map("board_id")
+  columnId      String?   @map("column_id")
+  title         String
+  description   String?
+  taskType      TaskType  @default(EXECUTION) @map("task_type")
+  priority      Priority  @default(MEDIUM)
+  startDate     DateTime? @map("start_date")
+  deadline      DateTime?
+  position      Int       @default(0)
+  estimatedTime Int?      @map("estimated_time")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  board  Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column Column?  @relation(fields: [columnId], references: [id], onDelete: SetNull)
+  tags   TaskTag[]
+
+  @@map("tasks")
+}
+
+model Tag {
+  id    String    @id @default(uuid())
+  name  String
+  color String
+  tasks TaskTag[]
+
+  @@map("tags")
+}
+
+model TaskTag {
+  taskId String @map("task_id")
+  tagId  String @map("tag_id")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+  @@map("task_tags")
+}
+
+model Client {
+  id          String   @id @default(uuid())
+  workspaceId String   @map("workspace_id")
+  name        String
+  email       String
+  phone       String?
+  company     String?
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("clients")
+}
+
+model Inspiration {
+  id          String   @id @default(uuid())
+  workspaceId String   @map("workspace_id")
+  title       String
+  imageUrl    String   @map("image_url")
+  sourceUrl   String?  @map("source_url")
+  category    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("inspirations")
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  eventType String   @map("event_type")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("analytics_events")
+}
+
+model MoodTracking {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  energyLevel Int      @map("energy_level")
+  mood        String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("mood_tracking")
+}
